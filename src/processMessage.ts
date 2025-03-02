@@ -1,4 +1,4 @@
-import * as AWS from 'aws-sdk'
+import AWS from 'aws-sdk'
 import { upsertEmbedding } from './upsertEmbeddings'
 import { generateEmbedding } from './generateEmbedding'
 
@@ -14,8 +14,10 @@ export async function processMessage(message: AWS.SQS.Message) {
     }
 
     const body = JSON.parse(messageBody)
-    const bucketName = body.bucketName
-    const objectKey = body.objectKey
+    const bucketName = body.bucket
+    const objectKey = body.key
+
+    console.log('body ', body)
 
     console.log(
       `Processing file from bucket "${bucketName}" with key "${objectKey}"`
@@ -27,8 +29,12 @@ export async function processMessage(message: AWS.SQS.Message) {
       .promise()
     const fileContent = object.Body?.toString('utf-8') || ''
 
+    console.log('fileContent', fileContent)
+
     // Generate embedding for file content
     const embedding = await generateEmbedding(fileContent)
+
+    console.log('embedding', embedding)
 
     if (embedding === undefined) {
       return
@@ -41,7 +47,11 @@ export async function processMessage(message: AWS.SQS.Message) {
     })
 
     console.log(`Successfully upserted embedding for file "${objectKey}"`)
+
+    return true
   } catch (error) {
     console.error('Error processing message:', error)
+
+    return false
   }
 }

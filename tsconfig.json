@@ -6,6 +6,7 @@
         "esModuleInterop": true,
         "exactOptionalPropertyTypes": true,
         "jsx": "react",
+        "module": "ESNext", // Set this to "ES6" or "ESNext" for ES module support
         "moduleResolution": "Node",
         "noEmit": false,
         "noFallthroughCasesInSwitch": true,
@@ -26,11 +27,12 @@
         "target": "ES2022",
         "declaration": true,
         "outDir": "./dist",
-        "emitDeclarationOnly": true,
+        "emitDeclarationOnly": false
     },
     "include": [
-        "./src/**/*.ts"
-, "index.ts"    ],
+        "./src/**/*.ts",
+        "index.ts"
+    ],
     "exclude": [
         "dist",
         "node_modules"

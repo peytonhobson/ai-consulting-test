@@ -1,4 +1,4 @@
-import { pineconeClient } from './pineconeClient'
+import { pineconeClient } from '../clients/pinecone'
 
 export async function queryEmbedding(vector: number[], topK: number = 5) {
   //TODO: env var

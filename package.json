@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc && node addJsExtension.js",
-    "start": "yarn build && node ./dist/index.js"
+    "type-check": "tsc --noEmit",
+    "build": "yarn type-check && babel src --out-dir dist --extensions \".ts,.tsx\"",
+    "process-new-files": "node ./dist/scripts/processNewFiles.js"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +23,9 @@
     "@babel/core": "^7.26.9",
     "@babel/plugin-transform-runtime": "^7.26.9",
     "@babel/preset-env": "^7.26.9",
+    "@babel/preset-typescript": "^7.26.0",
     "@types/node": "^22.13.8",
+    "babel-plugin-add-import-extension": "^1.6.0",
     "typescript": "^5.8.2"
   },
   "type": "module"

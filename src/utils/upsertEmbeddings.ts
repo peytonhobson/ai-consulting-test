@@ -1,4 +1,4 @@
-import { pineconeClient } from './pineconeClient'
+import { pineconeClient } from '../clients/pinecone'
 import type { RecordMetadata } from '@pinecone-database/pinecone'
 
 // TODO: Make index env var for reusability

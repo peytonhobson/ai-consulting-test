@@ -4,9 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "type-check": "tsc --noEmit",
-    "build": "yarn type-check && babel src --out-dir dist --extensions \".ts,.tsx\"",
+    "build": "pnpm type-check && babel src --out-dir dist --extensions \".ts,.tsx\"",
     "process-new-files": "node ./dist/scripts/processNewFiles.js"
   },
   "keywords": [],

@@ -1,9 +1,12 @@
 import json
-from datetime import datetime
 import streamlit as st
-from langchain.schema import HumanMessage, AIMessage
+import asyncio
 
-def main():
+from datetime import datetime
+from langchain.schema import HumanMessage, AIMessage
+from utils import prompt_ai
+
+async def main():
     st.title("Test Bot")
     if "messages" not in st.session_state:
         st.session_state.messages = [HumanMessage(content=(
@@ -13,7 +16,7 @@ def main():
         ))]
     
     for message in st.session_state.messages:
-        message_json = json.loads(message.json())
+        message_json = json.loads(message.model_dump_json())
         if message_json["type"] in ["human", "ai"]:
             with st.chat_message(message_json["type"]):
                 st.markdown(message_json["content"])
@@ -22,9 +25,9 @@ def main():
         st.chat_message("user").markdown(prompt)
         st.session_state.messages.append(HumanMessage(content=prompt))
         with st.chat_message("assistant"):
-            ai_response = prompt_ai(st.session_state.messages)
+            ai_response = await prompt_ai(st.session_state.messages)
             st.markdown(ai_response.content)
         st.session_state.messages.append(ai_response)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

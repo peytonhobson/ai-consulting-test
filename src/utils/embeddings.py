@@ -1,7 +1,7 @@
 from typing import List
 import os
 from dotenv import load_dotenv
-from src.clients.openai_embeddings import openai_embeddings_client
+from clients.openai_embeddings import openai_embeddings_client
 
 load_dotenv()
 

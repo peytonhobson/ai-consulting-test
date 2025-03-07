@@ -7,7 +7,7 @@ import asyncio
 
 from .document_processor import process_document
 from .embeddings import generate_document_embeddings
-from .vector_search import upsert_embeddings
+from .shared import upsert_embeddings
 
 load_dotenv()
 

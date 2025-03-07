@@ -1,6 +1,6 @@
 from typing import List, Optional
 from langchain_core.messages import HumanMessage, AIMessage
-from src.clients.openai_chat import openai_chat_client
+from clients.openai_chat import openai_chat_client
 from .shared import query_similar_records  # Import query_similar_records
 
 async def prompt_ai(messages: List[HumanMessage]) -> Optional[AIMessage]:

@@ -1,4 +1,4 @@
-.PHONY: install format lint test clean
+.PHONY: install format lint test clean test_llm
 
 install:
 	pip install -r requirements.txt
@@ -14,6 +14,10 @@ lint:
 
 test:
 	pytest
+
+# Add server run command
+test_llm:
+	python ./src/scripts/test_llm.py
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

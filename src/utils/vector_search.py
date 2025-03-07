@@ -1,36 +1,29 @@
-from typing import List, Optional, Dict, Any
-import os
-from dotenv import load_dotenv
+from typing import List, Optional
+from langchain_core.messages import HumanMessage, AIMessage
 
-from src.clients.openai_embeddings import openai_embeddings_client
-from src.clients.pinecone_client import pinecone_client
+from src.clients.openai_chat import openai_chat_client
+from .shared import query_similar_records
 
-load_dotenv()
-
-INDEX_NAME = os.getenv('PINECONE_INDEX_NAME', 'business-documents-test')
-index = pinecone_client.Index(INDEX_NAME)
-
-async def query_similar_records(query: str, top_k: int = 5) -> Optional[List[Dict[str, Any]]]:
-    """Query similar records from Pinecone using embedding."""
-    # Generate embedding for the query
-    embedding = await openai_embeddings_client.embed_query(query)
-    
-    if not embedding:
+async def prompt_ai(messages: List[HumanMessage]) -> Optional[AIMessage]:
+    """Process AI prompt with context from vector store."""
+    user_prompt = messages[-1].content if messages else ""
+    # Only call the API if there is an actual prompt.
+    if not user_prompt.strip():
         return None
 
-    # Query the index
-    query_response = await index.query(
-        vector=embedding,
-        top_k=top_k,
-        include_metadata=True
-    )
+    retrieved_context = await query_similar_records(user_prompt)
 
-    return query_response.matches
+    if retrieved_context is None:
+        formatted_prompt = user_prompt
+    else:
+        context_text = '\n'.join(match['values'] for match in retrieved_context)
+        formatted_prompt = f"Based on the following documents:\n{context_text}\n\nAnswer the question:\n{user_prompt}"
 
-async def upsert_embeddings(id: str, vector: List[float], metadata: Dict[str, Any]) -> None:
-    """Upsert embeddings to Pinecone."""
-    await index.upsert([{
-        'id': id,
-        'values': vector,
-        'metadata': metadata
-    }])
+    # Create conversation array
+    conversation = [*messages, HumanMessage(content=formatted_prompt)]
+    
+    # Call the LLM
+    response = await openai_chat_client.generate([conversation])
+    
+    content = response.generations[0][0].text if response.generations else None
+    return AIMessage(content=content) if content else None

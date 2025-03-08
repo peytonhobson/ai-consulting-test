@@ -23,6 +23,9 @@ test:
 test_llm: install-dev
 	streamlit run src/scripts/test_llm.py
 
+process_files: install-dev
+	python src/scripts/process_files.py
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete

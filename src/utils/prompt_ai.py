@@ -1,7 +1,10 @@
 from typing import List, Optional
 from langchain_core.messages import HumanMessage, AIMessage
-from clients.openai_chat import openai_chat_client
-from .shared import query_similar_records  # Import query_similar_records
+from clients.openai_chat import openai_chat_client  # Import query_similar_records
+
+async def query_similar_records(user_prompt: str):
+    # Implementation of query_similar_records
+    pass
 
 async def prompt_ai(messages: List[HumanMessage]) -> Optional[AIMessage]:
     """Process AI prompt with context from vector store."""

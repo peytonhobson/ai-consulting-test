@@ -1,14 +1,11 @@
-from .document_processor import process_document
-from .embeddings import generate_document_embeddings
-from .message_processor import process_message
 from .prompt_ai import prompt_ai
-from .shared import upsert_embeddings, query_similar_records
+from .document_processor import chunk_documents
+from .embeddings import generate_document_embeddings, upsert_embeddings
+# Need to import the missing functions from their respective modules
 
 __all__ = [
-    'process_document',
+    'chunk_documents',
     'generate_document_embeddings',
-    'process_message',
     'prompt_ai',
-    'query_similar_records',
     'upsert_embeddings',
 ]

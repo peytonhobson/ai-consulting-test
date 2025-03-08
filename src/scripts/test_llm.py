@@ -3,7 +3,7 @@ import streamlit as st
 import asyncio
 
 from datetime import datetime
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage
 from utils import prompt_ai
 
 async def main():

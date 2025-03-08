@@ -7,7 +7,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from utils import chunk_documents, generate_document_embeddings, upsert_embeddings
 from langchain.schema import Document
-from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, CSVLoader
 
 load_dotenv()
 
@@ -90,85 +90,8 @@ def parse_message(message):
         return None
 
 
-async def process_text_file(bucket_name, object_key, file_content, file_extension):
-    """Process a text-based file."""
-    print(f"Processing text file: {object_key} ({file_extension})")
-    return Document(
-        page_content=file_content,
-        metadata={
-            "bucketName": bucket_name,
-            "objectKey": object_key,
-            "source": f"s3://{bucket_name}/{object_key}",
-            "file_type": file_extension[1:]  # Remove the dot
-        }
-    )
-
-
-async def process_pdf_file(bucket_name, object_key, file_content):
-    """Process a PDF file."""
-    print(f"Processing PDF file: {object_key}")
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
-        temp_file.write(file_content)
-        temp_path = temp_file.name
-        print(f"Saved PDF to temporary file: {temp_path}")
-    
-    try:
-        loader = PyMuPDFLoader(temp_path)
-        pdf_docs = loader.load()
-        print(f"Loaded {len(pdf_docs)} pages from PDF: {object_key}")
-        
-        # Add metadata to each page
-        for pdf_doc in pdf_docs:
-            pdf_doc.metadata.update({
-                "bucketName": bucket_name,
-                "objectKey": object_key,
-                "source": f"s3://{bucket_name}/{object_key}",
-                "file_type": "pdf"
-            })
-        
-        return pdf_docs
-    finally:
-        # Clean up the temporary file
-        os.unlink(temp_path)
-        print(f"Removed temporary file: {temp_path}")
-
-
-async def process_excel_file(bucket_name, object_key, file_content, file_extension):
-    """Process an Excel file."""
-    print(f"Processing Excel file: {object_key} ({file_extension})")
-    docs = []
-    with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as temp_file:
-        temp_file.write(file_content)
-        temp_path = temp_file.name
-        print(f"Saved Excel file to temporary file: {temp_path}")
-    
-    try:
-        sheets = pd.read_excel(temp_path, sheet_name=None)
-        print(f"Found {len(sheets)} sheets in Excel file: {object_key}")
-        
-        for sheet_name, df in sheets.items():
-            print(f"Processing sheet: {sheet_name} with {len(df)} rows")
-            text = f"Sheet: {sheet_name}\n" + df.to_csv(index=False)
-            doc = Document(
-                page_content=text,
-                metadata={
-                    "bucketName": bucket_name,
-                    "objectKey": object_key,
-                    "source": f"s3://{bucket_name}/{object_key}",
-                    "file_type": file_extension[1:],
-                    "sheet_name": sheet_name
-                }
-            )
-            docs.append(doc)
-        return docs
-    finally:
-        # Clean up the temporary file
-        os.unlink(temp_path)
-        print(f"Removed temporary file: {temp_path}")
-
-
 async def download_and_process_file(file_info):
-    """Download a file from S3 and process it based on its type."""
+    """Download a file from S3 and process it based on its type using Langchain loaders."""
     bucket_name = file_info['bucket_name']
     object_key = file_info['object_key']
     
@@ -185,28 +108,63 @@ async def download_and_process_file(file_info):
         file_extension = os.path.splitext(object_key)[1].lower()
         print(f"Detected file extension: {file_extension}")
         
-        # Process file based on its type
-        if file_extension in ['.txt', '.md', '.json', '.csv']:
-            # Text files can be decoded
-            print(f"Processing as text file: {object_key}")
-            text_content = file_content.decode('utf-8')
-            doc = await process_text_file(bucket_name, object_key, text_content, file_extension)
-            return [doc], True
+        # Create a temporary file to use with Langchain loaders
+        with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as temp_file:
+            temp_file.write(file_content)
+            temp_path = temp_file.name
+            print(f"Saved file to temporary path: {temp_path}")
         
-        elif file_extension == '.pdf':
-            print(f"Processing as PDF file: {object_key}")
-            pdf_docs = await process_pdf_file(bucket_name, object_key, file_content)
-            return pdf_docs, True
-        
-        elif file_extension in ['.xlsx', '.xls']:
-            print(f"Processing as Excel file: {object_key}")
-            excel_docs = await process_excel_file(bucket_name, object_key, file_content, file_extension)
-            return excel_docs, True
-        
-        else:
-            # Unsupported file type
-            print(f"Unsupported file type: {file_extension} for {object_key}")
-            return [], False
+        docs = []
+        try:
+            # Process file based on its type using Langchain loaders
+            if file_extension == '.txt':
+                print(f"Processing as text file: {object_key}")
+                loader = TextLoader(temp_path)
+                docs = loader.load()
+            
+            elif file_extension == '.pdf':
+                print(f"Processing as PDF file: {object_key}")
+                loader = PyMuPDFLoader(temp_path)
+                docs = loader.load()
+            
+            elif file_extension == '.csv':
+                print(f"Processing as CSV file: {object_key}")
+                loader = CSVLoader(temp_path)
+                docs = loader.load()
+            
+            elif file_extension in ['.xlsx', '.xls']:
+                print(f"Processing as Excel file: {object_key}")
+                sheets = pd.read_excel(temp_path, sheet_name=None)
+                for sheet_name, df in sheets.items():
+                    text = f"Sheet: {sheet_name}\n" + df.to_csv(index=False)
+                    docs.append(Document(
+                        page_content=text,
+                        metadata={
+                            "sheet_name": sheet_name
+                        }
+                    ))
+            
+            else:
+                # Unsupported file type
+                print(f"Unsupported file type: {file_extension} for {object_key}")
+                return [], False
+            
+            # Add metadata to all documents
+            for doc in docs:
+                doc.metadata.update({
+                    "bucketName": bucket_name,
+                    "objectKey": object_key,
+                    "source": f"s3://{bucket_name}/{object_key}",
+                    "file_type": file_extension[1:]  # Remove the dot
+                })
+            
+            print(f"Processed {len(docs)} documents from {object_key}")
+            return docs, True
+            
+        finally:
+            # Clean up the temporary file
+            os.unlink(temp_path)
+            print(f"Removed temporary file: {temp_path}")
             
     except Exception as e:
         print(f"Error processing file {object_key}: {e}")

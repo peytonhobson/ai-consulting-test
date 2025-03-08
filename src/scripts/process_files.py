@@ -4,6 +4,10 @@ import json
 import asyncio
 import tempfile
 import pandas as pd
+import json
+import asyncio
+import tempfile
+import pandas as pd
 from dotenv import load_dotenv
 from utils import chunk_documents, generate_document_embeddings, upsert_embeddings
 from langchain.schema import Document
@@ -59,6 +63,10 @@ async def process_sqs_messages():
                     success_count += 1
                 elif not success:
                     print(f"Failed to process message: {message.get('MessageId')}")
+            
+            print(f"Successfully processed and deleted {success_count} of {len(messages)} messages")
+        
+        print(f"Finished processing a total of {message_count} messages")
             
             print(f"Successfully processed and deleted {success_count} of {len(messages)} messages")
         

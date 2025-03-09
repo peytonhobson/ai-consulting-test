@@ -1,17 +1,16 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
-    name="business-documents",
+    name="cognitive-core",
     version="0.1.0",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
     install_requires=[
-        "langchain-openai>=0.0.5",
+        "langchain-openai>=0.3.0",
         "python-dotenv>=1.0.0",
-        "pinecone-client>=3.0.0",
-        "boto3>=1.34.0",
-        "streamlit>=1.30.0",
-        "langchain-core>=0.1.0",
+        "pinecone>=6.0.0",
+        "streamlit>=1.43.0",
+        "langchain-core>=0.3.0",
+        "langchain-community>=0.3.0",
+        "numpy==1.23.5",
     ],
     python_requires=">=3.8",
 )

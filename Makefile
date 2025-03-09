@@ -1,12 +1,11 @@
 .PHONY: install install-dev format lint test clean test_llm
 
 install-dev:
-	pip install -e .
+	pip install -r requirements-dev.txt
 
 install:
 	pip install -e .
 	pip install -r requirements.txt
-	pip install -r requirements-dev.txt
 
 format:
 	black .
@@ -16,16 +15,9 @@ lint:
 	flake8 .
 	mypy .
 
-test:
-	pytest
-
-# Add server run command
-test_llm: install-dev
-	streamlit run src/scripts/test_llm.py
-
-process_files: install-dev
-	python src/scripts/process_files.py
-
+test_llm:
+	streamlit run test_llm.py
+	
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete

@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage, AIMessage
 from clients import openai_chat_client, pinecone_index
 import numpy as np
-from utils.embeddings import generate_query_embedding, generate_document_embeddings
+from utils.embeddings import generate_query_embedding
 
 
 def calculate_mmr(doc_embeddings, query_embedding, lambda_param=0.7, top_k=6):
@@ -82,13 +82,6 @@ async def query_similar_records(user_prompt: str):
     if len(unique_docs) > 1:
         if "values" in unique_docs[0] and unique_docs[0]["values"]:
             doc_embeddings = np.array([doc["values"] for doc in unique_docs])
-        else:
-            # Fallback to regenerating embeddings if not included in response
-            doc_texts = [doc["metadata"].get("chunk_text", "") for doc in unique_docs]
-            doc_embeddings = await generate_document_embeddings(doc_texts)
-            if not doc_embeddings:
-                return []
-            doc_embeddings = np.array(doc_embeddings)
 
         query_embedding = await generate_query_embedding(user_prompt)
         if not query_embedding:

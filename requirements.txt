@@ -1,14 +1,7 @@
-langchain-openai
-python-dotenv
-pinecone
-boto3
-streamlit
-langchain-core
-langchain
-spacy
-pandas
-langchain_community
-en_core_web_sm @ https://huggingface.co/spacy/en_core_web_sm/resolve/main/en_core_web_sm-any-py3-none-any.whl
-pymupdf
-sentence-transformers
-flashrank
+langchain-openai>=0.3.0
+python-dotenv>=1.0.0
+pinecone>=6.0.0
+streamlit>=1.43.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+numpy==1.23.5

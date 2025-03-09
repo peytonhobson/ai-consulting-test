@@ -31,6 +31,4 @@ A document processing and querying system using LangChain, OpenAI, and Pinecone.
 Required environment variables:
 - OPENAI_API_KEY: Your OpenAI API key
 - PINECONE_API_KEY: Your Pinecone API key
-- AWS_PROFILE: AWS profile for authentication
-- AWS_REGION: AWS region (default: us-east-1)
-- QUEUE_URL: SQS queue URL for processing
+- PINECONE_INDEX: Pinecone Index Name

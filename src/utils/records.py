@@ -1,7 +1,7 @@
-from langchain_core.messages import HumanMessage, AIMessage
 from clients import openai_chat_client, pinecone_index
-import numpy as np
 from utils.embeddings import generate_query_embedding
+import numpy as np
+from langchain_core.messages import HumanMessage
 
 
 def calculate_mmr(doc_embeddings, query_embedding, lambda_param=0.7, top_k=6):
@@ -102,62 +102,3 @@ async def query_similar_records(user_prompt: str):
         f"Location: {doc['metadata'].get('source', 'Unknown')}"
         for doc in final_docs
     ]
-
-
-async def prompt_ai(messages):
-    """
-    Main function that:
-    1. Gets relevant context for the user's question
-    2. Generates an answer using the context
-    3. Verifies the answer's accuracy
-    """
-    # Get the user's latest question
-    user_prompt = messages[-1].content
-
-    # Find relevant documents
-    retrieved_context = await query_similar_records(user_prompt)
-    default_text = "This is a default sample text because no documents were provided."
-
-    print("retrieved_context", retrieved_context)
-
-    # If no relevant documents found, just answer the question directly
-    if retrieved_context and default_text in retrieved_context[0]:
-        formatted_prompt = user_prompt
-        verification_needed = False
-    else:
-        # Include retrieved context in the prompt
-        formatted_prompt = (
-            f"Based on the following documents:\n{retrieved_context}\n\n"
-            f"Answer the question:\n{user_prompt}"
-        )
-        verification_needed = True
-
-    # Get initial answer from AI
-    conversation = messages + [HumanMessage(content=formatted_prompt)]
-    initial_response = openai_chat_client(conversation)
-    answer = initial_response.content
-
-    # Verify answer accuracy if we used retrieved context
-    if verification_needed:
-        verify_prompt = (
-            f"Documents:\n{retrieved_context}\n\n"
-            f"Answer: {answer}\n\n"
-            "Is this answer accurate and well supported by the documents? "
-            "(Respond with 'yes' or 'no' and a brief explanation.)"
-        )
-        verification_response = openai_chat_client(
-            [HumanMessage(content=verify_prompt)]
-        )
-        verification = verification_response.content.lower()
-
-        # Only use answer if verification passes
-        confidence = 1.0 if "yes" in verification else 0.5
-        final_answer = (
-            answer
-            if confidence >= 0.7
-            else "I'm not sure about this answer. Please reach out VIA email for additional assistance."
-        )
-    else:
-        final_answer = answer
-
-    return AIMessage(content=final_answer)

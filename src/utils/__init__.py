@@ -1,7 +1,7 @@
-from .prompt_ai import prompt_ai
+from .records import query_similar_records
 
 # Need to import the missing functions from their respective modules
 
 __all__ = [
-    "prompt_ai",
+    "query_similar_records",
 ]

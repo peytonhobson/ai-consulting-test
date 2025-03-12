@@ -78,22 +78,9 @@ async def query_similar_records(user_prompt: str):
         {doc["metadata"].get("chunk_text", ""): doc for doc in all_docs}.values()
     )
 
-    # Use MMR to select diverse, relevant documents
-    if len(unique_docs) > 1:
-        if "values" in unique_docs[0] and unique_docs[0]["values"]:
-            doc_embeddings = np.array([doc["values"] for doc in unique_docs])
+    # TODO: Add flash rerank
 
-        query_embedding = await generate_query_embedding(user_prompt)
-        if not query_embedding:
-            return []
-
-        # Select documents using MMR
-        selected_indices = calculate_mmr(
-            doc_embeddings, query_embedding, lambda_param=0.7, top_k=6
-        )
-        final_docs = [unique_docs[i] for i in selected_indices]
-    else:
-        final_docs = unique_docs[:6]
+    final_docs = unique_docs[:6]
 
     # Return formatted context from the documents
     return [

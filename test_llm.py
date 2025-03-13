@@ -1,8 +1,8 @@
 import streamlit as st
 import asyncio
+from src.clients import assistant_client
 from llm import handle_prompt
 from llm.process_queries import get_thread_messages
-from clients import assistant_client
 
 
 async def main():
@@ -39,6 +39,7 @@ async def main():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 ai_response = await handle_prompt(st.session_state.thread_id, prompt)
+
                 # Enable HTML rendering for AI response
                 st.markdown(ai_response, unsafe_allow_html=True)
 

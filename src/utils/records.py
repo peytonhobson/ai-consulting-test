@@ -1,49 +1,14 @@
 from clients import openai_chat_client, pinecone_index
 from utils.embeddings import generate_query_embedding
-import numpy as np
 from langchain_core.messages import HumanMessage
+from flashrank import Ranker, RerankRequest
+import os
 
+cache_dir = "./cache/flashrank"
+os.makedirs(cache_dir, exist_ok=True)
 
-def calculate_mmr(doc_embeddings, query_embedding, lambda_param=0.7, top_k=6):
-    """
-    Calculate Maximum Marginal Relevance (MMR) for document selection.
-    lambda_param: Balance between relevance (similarity to query) and diversity
-        - Higher lambda (closer to 1) = more relevance to query
-        - Lower lambda (closer to 0) = more diversity
-    top_k: Number of documents to return
-    """
-    selected_indices = []
-    remaining_indices = list(range(len(doc_embeddings)))
-
-    # Calculate how similar each document is to the query
-    similarities = np.dot(doc_embeddings, query_embedding)
-
-    # Select documents one by one
-    for _ in range(top_k):
-        if not remaining_indices:
-            break
-
-        # For each remaining document, calculate MMR score:
-        # MMR = λ * (relevance to query) - (1-λ) * (similarity to already selected docs)
-        mmr_scores = []
-        for idx in remaining_indices:
-            if not selected_indices:
-                redundancy = 0  # First document has no redundancy
-            else:
-                # Find how similar this doc is to already selected docs
-                redundancy = max(
-                    np.dot(doc_embeddings[idx], doc_embeddings[j])
-                    for j in selected_indices
-                )
-            mmr = lambda_param * similarities[idx] - (1 - lambda_param) * redundancy
-            mmr_scores.append(mmr)
-
-        # Pick the document with best balance of relevance and diversity
-        next_idx = remaining_indices[np.argmax(mmr_scores)]
-        selected_indices.append(next_idx)
-        remaining_indices.remove(next_idx)
-
-    return selected_indices
+# Instantiate the Ranker at module level
+ranker = Ranker(model_name="rank-T5-flan", cache_dir=cache_dir)
 
 
 async def query_similar_records(user_prompt: str):
@@ -65,7 +30,7 @@ async def query_similar_records(user_prompt: str):
             results = pinecone_index.query(
                 namespace="",
                 vector=query_vector,
-                top_k=15,
+                top_k=12,
                 include_metadata=True,
                 include_values=True,
             )
@@ -78,9 +43,25 @@ async def query_similar_records(user_prompt: str):
         {doc["metadata"].get("chunk_text", ""): doc for doc in all_docs}.values()
     )
 
-    # TODO: Add flash rerank
+    # Re-rank unique_docs using rank-T5-flan to select the top 6
+    if unique_docs:
+        try:
+            passages = [{"text": doc["metadata"]["chunk_text"]} for doc in unique_docs]
+            rerank_request = RerankRequest(query=user_prompt, passages=passages)
+            reranked = ranker.rerank(rerank_request)
 
-    final_docs = unique_docs[:6]
+            # Use a safer approach to get indices
+            final_docs = []
+            for i in range(min(6, len(reranked))):
+                if i >= len(unique_docs):
+                    break
+                final_docs.append(unique_docs[i])
+        except Exception as e:
+            print(f"Error during reranking: {e}")
+            # Fallback to top 6 (or fewer) docs without reranking
+            final_docs = unique_docs[: min(6, len(unique_docs))]
+    else:
+        final_docs = []
 
     # Return formatted context from the documents
     return [

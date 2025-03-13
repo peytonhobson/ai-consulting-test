@@ -1,8 +1,14 @@
 import streamlit as st
 import asyncio
+from openai import OpenAI
+from src.utils.config import openai_client
 from llm import handle_prompt
 from llm.process_queries import get_thread_messages
-from clients import assistant_client
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+assistant_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def main():

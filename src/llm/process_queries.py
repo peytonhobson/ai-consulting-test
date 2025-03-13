@@ -1,5 +1,6 @@
 import os
 from openai import OpenAI, APIError
+import time
 
 # Synchronous OpenAI client for Assistant API
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -18,6 +19,21 @@ async def process_query(thread_id, user_prompt, retrieved_context=None):
         The formatted response from the assistant
     """
     try:
+        # Check if a run is active and wait for it to complete
+        active_runs = client.beta.threads.runs.list(thread_id=thread_id, limit=1)
+        for run in active_runs.data:
+            if run.status in ["in_progress", "queued", "requires_action"]:
+                print(f"Waiting for run {run.id} to complete...")
+                # Poll until the run is complete
+                while run.status in ["in_progress", "queued", "requires_action"]:
+                    run = client.beta.threads.runs.retrieve(
+                        thread_id=thread_id, run_id=run.id
+                    )
+                    if run.status not in ["in_progress", "queued", "requires_action"]:
+                        break
+                    time.sleep(1)  # Wait before checking again
+                print(f"Run {run.id} completed with status: {run.status}")
+
         # Add context as a system message if available
         if retrieved_context:
             context_message = f"Context for answering: {retrieved_context}"
@@ -57,12 +73,28 @@ async def process_query(thread_id, user_prompt, retrieved_context=None):
                                 if out.type == "logs":
                                     output += out.logs + "\n"
 
-        # Get the latest assistant message
+        # Get the latest assistant message (not user message)
         messages = client.beta.threads.messages.list(thread_id=thread_id)
         if not messages.data:
             return "No response received."
 
-        latest_message = messages.data[0].content[0].text.value
+        # Find the most recent assistant message AFTER creating the run
+        # The run ID can help identify messages that came after our query
+        latest_message = None
+        for msg in messages.data:
+            if msg.role == "assistant" and msg.created_at > run.created_at:
+                latest_message = msg.content[0].text.value
+                break
+
+        if not latest_message:
+            # If we can't find a message after our run, at least get the most recent assistant message
+            for msg in messages.data:
+                if msg.role == "assistant":
+                    latest_message = msg.content[0].text.value
+                    break
+
+        if not latest_message:
+            return "No assistant response found."
 
         # Format with HTML dropdown if code is present
         if code:

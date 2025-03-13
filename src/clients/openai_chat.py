@@ -1,7 +1,7 @@
-from langchain_openai import ChatOpenAI
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-openai_chat_client = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+openai_chat_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

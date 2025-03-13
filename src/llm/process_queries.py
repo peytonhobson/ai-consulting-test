@@ -7,32 +7,46 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def process_query(thread_id, user_prompt, retrieved_context=None):
-    """
-    Process a query using the OpenAI Assistant API.
+    """Process a query using the OpenAI Assistant API."""
+    start_time = time.time()
 
-    Args:
-        thread_id: The ID of the thread to use
-        user_prompt: The user's question
-        retrieved_context: Optional context from vector search
-
-    Returns:
-        The formatted response from the assistant
-    """
     try:
-        # Check if a run is active and wait for it to complete
+        # Check if a run is active - only enter polling loop if needed
         active_runs = client.beta.threads.runs.list(thread_id=thread_id, limit=1)
-        for run in active_runs.data:
-            if run.status in ["in_progress", "queued", "requires_action"]:
-                print(f"Waiting for run {run.id} to complete...")
-                # Poll until the run is complete
-                while run.status in ["in_progress", "queued", "requires_action"]:
-                    run = client.beta.threads.runs.retrieve(
-                        thread_id=thread_id, run_id=run.id
-                    )
-                    if run.status not in ["in_progress", "queued", "requires_action"]:
-                        break
-                    time.sleep(1)  # Wait before checking again
-                print(f"Run {run.id} completed with status: {run.status}")
+
+        # Only enter waiting loop if there's actually an active run
+        if active_runs.data and active_runs.data[0].status in [
+            "in_progress",
+            "queued",
+            "requires_action",
+        ]:
+            active_run = active_runs.data[0]
+            print(f"Waiting for run {active_run.id} to complete...")
+
+            # Poll until the run is complete with a smarter polling strategy
+            wait_time = 0.2  # Start with 200ms wait
+            while active_run.status in ["in_progress", "queued", "requires_action"]:
+                active_run = client.beta.threads.runs.retrieve(
+                    thread_id=thread_id, run_id=active_run.id
+                )
+                if active_run.status not in [
+                    "in_progress",
+                    "queued",
+                    "requires_action",
+                ]:
+                    break
+
+                # Use adaptive polling: increase wait time as we wait longer
+                wait_time = min(wait_time * 1.5, 1.0)  # Cap at 1 second
+                time.sleep(wait_time)
+
+            print(f"Run {active_run.id} completed with status: {active_run.status}")
+        else:
+            print("No active runs, proceeding with query")
+
+        # Add timing checkpoint
+        check_time = time.time() - start_time
+        print(f"Run check completed in {check_time:.2f}s")
 
         # Add context as a system message if available
         if retrieved_context:
@@ -103,6 +117,9 @@ async def process_query(thread_id, user_prompt, retrieved_context=None):
             )
         else:
             formatted_answer = latest_message
+
+        total_time = time.time() - start_time
+        print(f"Total query processing time: {total_time:.2f}s")
 
         return formatted_answer
 

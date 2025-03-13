@@ -1,6 +1,5 @@
 from clients import openai_chat_client, pinecone_index
 from utils.embeddings import generate_query_embedding
-from langchain_core.messages import HumanMessage
 from flashrank import Ranker, RerankRequest
 import os
 
@@ -17,10 +16,24 @@ async def query_similar_records(user_prompt: str):
     """
     # Step 1: Generate different versions of the user's question to improve search
     expand_prompt = f"Rephrase this query in 2 different ways to help find relevant information:\nQuery: {user_prompt}"
-    expand_response = openai_chat_client([HumanMessage(content=expand_prompt)])
-    expanded_queries = [user_prompt] + [
-        q.strip() for q in expand_response.content.split("\n") if q.strip()
-    ]
+
+    expand_response = openai_chat_client.responses.create(
+        model="gpt-4o",
+        input=expand_prompt,
+    )
+
+    # Extract the rephrased queries from the new response structure
+    rephrased_queries = []
+    if expand_response.output and len(expand_response.output) > 0:
+        message = expand_response.output[0]
+        if message.content and len(message.content) > 0:
+            for content_item in message.content:
+                if content_item.type == "output_text":
+                    rephrased_queries.extend(
+                        [q.strip() for q in content_item.text.split("\n") if q.strip()]
+                    )
+
+    expanded_queries = [user_prompt] + rephrased_queries
 
     # Step 2: Search for relevant documents using each query
     all_docs = []

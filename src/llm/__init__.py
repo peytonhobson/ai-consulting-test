@@ -1,6 +1,6 @@
-from .prompt_handler import handle_prompt
+from .process_queries import process_query
 
 
 __all__ = [
-    "handle_prompt",
+    "process_query",
 ]

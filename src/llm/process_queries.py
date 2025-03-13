@@ -1,137 +1,84 @@
+from .instructions import instructions
+from openai import APIError
+from src.clients import openai_chat_client as client
+from src.utils import query_similar_records
+from dotenv import load_dotenv
 import os
-from openai import OpenAI, APIError
-import time
 
-# Synchronous OpenAI client for Assistant API
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv()
 
 
-async def process_query(thread_id, user_prompt, retrieved_context=None):
+async def process_query(previous_response_id, user_prompt):
     """
-    Process a query using the OpenAI Assistant API.
+    Process a query using the OpenAI Response API.
 
     Args:
-        thread_id: The ID of the thread to use
+        previous_response_id: The ID of the previous response (for multi-turn conversations)
         user_prompt: The user's question
-        retrieved_context: Optional context from vector search
 
     Returns:
-        The formatted response from the assistant
+        Tuple of (formatted_response, new_response_id)
     """
     try:
-        # Check if a run is active and wait for it to complete
-        active_runs = client.beta.threads.runs.list(thread_id=thread_id, limit=1)
-        for run in active_runs.data:
-            if run.status in ["in_progress", "queued", "requires_action"]:
-                print(f"Waiting for run {run.id} to complete...")
-                # Poll until the run is complete
-                while run.status in ["in_progress", "queued", "requires_action"]:
-                    run = client.beta.threads.runs.retrieve(
-                        thread_id=thread_id, run_id=run.id
-                    )
-                    if run.status not in ["in_progress", "queued", "requires_action"]:
-                        break
-                    time.sleep(1)  # Wait before checking again
-                print(f"Run {run.id} completed with status: {run.status}")
+        retrieved_context = await query_similar_records(user_prompt)
 
-        # Add context as a system message if available
-        if retrieved_context:
-            context_message = f"Context for answering: {retrieved_context}"
-            client.beta.threads.messages.create(
-                thread_id=thread_id, role="user", content=context_message
-            )
+        # Prepare the input message
+        input_message = f"Context for answering: {retrieved_context}\n\n{user_prompt}"
 
-        # Add the user's question
-        client.beta.threads.messages.create(
-            thread_id=thread_id, role="user", content=user_prompt
+        # Create the response using the OpenAI Response API
+        response = client.responses.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+            input=input_message,
+            instructions=instructions,
+            previous_response_id=previous_response_id,
         )
 
-        # Run the assistant
-        run = client.beta.threads.runs.create_and_poll(
-            thread_id=thread_id,
-            assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
-        )
+        # Extract the response content from the new structure
+        response_content = ""
+        if response.output and len(response.output) > 0:
+            message = response.output[0]
+            if message.content and len(message.content) > 0:
+                for content_item in message.content:
+                    if content_item.type == "output_text":
+                        response_content += content_item.text
 
-        if run.status == "failed":
-            return "I encountered an error processing your request."
+        response_id = response.id
 
-        # Get code and output from run steps if available
-        run_steps = client.beta.threads.runs.steps.list(
-            thread_id=thread_id, run_id=run.id
-        )
+        # TODO: Add back in once code interpreter is implemented
+        # Check if there's any code output to format
+        # code = ""
+        # output = ""
 
-        code = ""
-        output = ""
-        for step in run_steps.data:
-            if step.step_details.type == "tool_calls":
-                for tool_call in step.step_details.tool_calls:
-                    if tool_call.type == "code_interpreter":
-                        code = tool_call.code_interpreter.input or ""
-                        if tool_call.code_interpreter.outputs:
-                            for out in tool_call.code_interpreter.outputs:
-                                if out.type == "logs":
-                                    output += out.logs + "\n"
-
-        # Get the latest assistant message (not user message)
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-        if not messages.data:
-            return "No response received."
-
-        # Find the most recent assistant message AFTER creating the run
-        # The run ID can help identify messages that came after our query
-        latest_message = None
-        for msg in messages.data:
-            if msg.role == "assistant":
-                latest_message = msg.content[0].text.value
-                break
-
-        if not latest_message:
-            return "No assistant response found."
+        # If there are tool calls in the response, extract code and output
+        # if hasattr(response, "tools") and response.tools:
+        #     for tool in response.tools:
+        #         if tool.type == "code_interpreter":
+        #             if hasattr(tool, "code_interpreter") and tool.code_interpreter:
+        #                 code = tool.code_interpreter.input or ""
+        #                 if tool.code_interpreter.outputs:
+        #                     for out in tool.code_interpreter.outputs:
+        #                         if out.type == "logs":
+        #                             output += out.logs + "\n"
 
         # Format with HTML dropdown if code is present
-        if code:
-            formatted_answer = (
-                f"{latest_message}\n\n"
-                "<details>\n"
-                "<summary>View Python code and output</summary>\n\n"
-                "```python\n"
-                f"{code}\n"
-                "```\n\n"
-                "Output:\n"
-                f"{output or 'No output captured.'}\n"
-                "</details>"
-            )
-        else:
-            formatted_answer = latest_message
+        # if code:
+        #     formatted_answer = (
+        #         f"{response_content}\n\n"
+        #         "<details>\n"
+        #         "<summary>View Python code and output</summary>\n\n"
+        #         "```python\n"
+        #         f"{code}\n"
+        #         "```\n\n"
+        #         "Output:\n"
+        #         f"{output or 'No output captured.'}\n"
+        #         "</details>"
+        #     )
+        # else:
+        # formatted_answer = response_content
 
-        return formatted_answer
+        return response_content, response_id
 
     except APIError as e:
-        return f"API Error: {str(e)}"
+        return f"API Error: {str(e)}", None
     except Exception as e:
-        return f"Unexpected Error: {str(e)}"
-
-
-def get_thread_messages(thread_id):
-    """
-    Retrieve all messages from a thread.
-
-    Args:
-        thread_id: The ID of the thread
-
-    Returns:
-        List of messages with role and content
-    """
-    try:
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-        formatted_messages = []
-
-        for msg in reversed(messages.data):  # Reverse to get chronological order
-            role = "ai" if msg.role == "assistant" else "human"
-            content = msg.content[0].text.value if msg.content else ""
-            formatted_messages.append({"type": role, "content": content})
-
-        return formatted_messages
-    except Exception as e:
-        print(f"Error retrieving messages: {e}")
-        return []
+        return f"Unexpected Error: {str(e)}", None

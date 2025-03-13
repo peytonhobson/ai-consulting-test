@@ -1,11 +1,14 @@
 from clients import openai_chat_client, pinecone_index
 from utils.embeddings import generate_query_embedding
-import numpy as np
 from langchain_core.messages import HumanMessage
 from flashrank import Ranker, RerankRequest
+import os
+
+cache_dir = "./cache/flashrank"
+os.makedirs(cache_dir, exist_ok=True)
 
 # Instantiate the Ranker at module level
-ranker = Ranker(model_name="rank-T5-flan", cache_dir="/opt")
+ranker = Ranker(model_name="rank-T5-flan", cache_dir=cache_dir)
 
 
 async def query_similar_records(user_prompt: str):
@@ -40,21 +43,12 @@ async def query_similar_records(user_prompt: str):
         {doc["metadata"].get("chunk_text", ""): doc for doc in all_docs}.values()
     )
 
-    # ...existing code...
-
     # Re-rank unique_docs using rank-T5-flan to select the top 6
     if unique_docs:
         try:
             passages = [{"text": doc["metadata"]["chunk_text"]} for doc in unique_docs]
             rerank_request = RerankRequest(query=user_prompt, passages=passages)
             reranked = ranker.rerank(rerank_request)
-
-            # Debug: Print the first reranked item to see its structure
-            if reranked:
-                print("Reranked item keys:", reranked[0].keys())
-                print("Reranked item:", reranked[0])
-
-            num_to_select = min(7, len(reranked))
 
             # Use a safer approach to get indices
             final_docs = []

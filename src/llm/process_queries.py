@@ -50,7 +50,6 @@ async def process_query(thread_id, user_prompt, retrieved_context=None):
         run = client.beta.threads.runs.create_and_poll(
             thread_id=thread_id,
             assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
-            timeout=30,
         )
 
         if run.status == "failed":
@@ -82,16 +81,9 @@ async def process_query(thread_id, user_prompt, retrieved_context=None):
         # The run ID can help identify messages that came after our query
         latest_message = None
         for msg in messages.data:
-            if msg.role == "assistant" and msg.created_at > run.created_at:
+            if msg.role == "assistant":
                 latest_message = msg.content[0].text.value
                 break
-
-        if not latest_message:
-            # If we can't find a message after our run, at least get the most recent assistant message
-            for msg in messages.data:
-                if msg.role == "assistant":
-                    latest_message = msg.content[0].text.value
-                    break
 
         if not latest_message:
             return "No assistant response found."

@@ -3,9 +3,12 @@
 install-dev:
 	pip install -r requirements-dev.txt
 
-install:
+install: download-model-files
 	pip install -e .
 	pip install -r requirements.txt
+
+download-model-files:
+	python src/utils/download_model_files.py
 
 format:
 	black .
